@@ -23,9 +23,10 @@ def home():
 @app.route('/balance', methods=['GET'])
 def get_balance():
     try:
-        balance = exchange.fetch_balance()
-        usdt_balance = balance['total'].get('USDT', 0)  # USDT bakiyesini al
-        btc_balance = balance['total'].get('BTC', 0)    # BTC bakiyesini al
+        balance = exchange.fetch_balance()  # Bybit'ten bakiye verisini çek
+        usdt_balance = balance.get('total', {}).get('USDT', 0)  # USDT bakiyesini al
+        btc_balance = balance.get('total', {}).get('BTC', 0)    # BTC bakiyesini al
+
         return jsonify({
             "BTC Balance": btc_balance,
             "USDT Balance": usdt_balance
