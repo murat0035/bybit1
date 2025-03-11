@@ -24,16 +24,10 @@ def home():
 def get_balance():
     try:
         balance = exchange.fetch_balance()  # Bybit'ten bakiye verisini çek
-        usdt_balance = balance.get('total', {}).get('USDT', 0)  # USDT bakiyesini al
-        btc_balance = balance.get('total', {}).get('BTC', 0)    # BTC bakiyesini al
-
-        return jsonify({
-            "BTC Balance": btc_balance,
-            "USDT Balance": usdt_balance
-        })
+        print(balance)  # Loglara yazdırarak verinin formatını kontrol et
+        return jsonify(balance)  # Gelen veriyi direkt döndür
     except Exception as e:
         return jsonify({"error": str(e)})
-
 # ✅ BTC/USDT Anlık Fiyatını Al
 @app.route('/price', methods=['GET'])
 def get_price():
