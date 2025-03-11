@@ -24,10 +24,15 @@ def home():
 def get_balance():
     try:
         balance = exchange.fetch_balance()  # Bybit'ten bakiye verisini çek
-        print("Bybit'ten Gelen Veri:", balance)  # Loglara yazdır
         
-        # Gelen veriyi test etmek için JSON olarak döndür
-        return jsonify(balance)
+        # 🔹 JSON formatında doğru mu kontrol edelim
+        if isinstance(balance, dict):
+            print("Bybit'ten Gelen Ham Veri:", balance)  # Loglara yaz
+            return jsonify({"raw_balance": balance})  # Tüm JSON'u döndür
+        
+        else:
+            return jsonify({"error": "Bybit API'den beklenmeyen bir veri formatı geldi."})
+    
     except Exception as e:
         return jsonify({"error": str(e)})
 # ✅ BTC/USDT Anlık Fiyatını Al
