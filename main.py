@@ -30,14 +30,15 @@ def get_balance():
         }
         params["sign"] = create_signature(params, api_secret)
         
-        response = requests.get(f"{BYBIT_API_URL}/v2/private/wallet/balance", params=params)
-        data = response.json()
+        response = requests.get(f"{BYBIT_API_URL}/v5/account/wallet-balance", params=params)  # Yeni v5 endpoint!
         
-        print("Bybit'ten Gelen Ham Veri:", data)  # Loglara yaz
+        print("Bybit API Yanıtı:", response.text)  # Loglara yaz
+        
+        data = response.json()  # JSON olarak parse etmeye çalış
         
         if "result" in data:
-            usdt_balance = data["result"].get("USDT", {}).get("available_balance", 0)
-            btc_balance = data["result"].get("BTC", {}).get("available_balance", 0)
+            usdt_balance = data["result"]["list"][0]["coin"][0]["availableToWithdraw"]
+            btc_balance = data["result"]["list"][0]["coin"][1]["availableToWithdraw"]
         else:
             return jsonify({"error": "Bybit API beklenen formatta yanıt vermedi.", "response": data})
         
@@ -48,6 +49,7 @@ def get_balance():
     
     except Exception as e:
         return jsonify({"error": str(e)})
+
 
 # ✅ BTC/USDT Piyasa Fiyatını Al
 @app.route('/price', methods=['GET'])
