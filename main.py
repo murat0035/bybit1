@@ -8,7 +8,7 @@ import logging
 
 app = Flask(__name__)
 
-# ✅ Render.com için Log Ayarları
+# ✅ Log Ayarları
 logging.basicConfig(level=logging.INFO)
 
 # ✅ Çevresel Değişkenlerden API Key ve Secret'ı Al
@@ -23,106 +23,46 @@ def create_signature(params, secret):
     query_string = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
     return hmac.new(secret.encode(), query_string.encode(), hashlib.sha256).hexdigest()
 
-# ✅ MEXC API Üzerinden Bakiye Sorgulama
-@app.route('/balance', methods=['GET'])
-def get_balance():
+# ✅ Açık ve Geçmiş Siparişleri (Orders) Sorgula
+@app.route('/orders', methods=['GET'])
+def get_orders():
     try:
+        symbol = request.args.get("symbol", "BTCUSDT")  # Varsayılan BTC/USDT
         timestamp = int(time.time() * 1000)
-        params = {"timestamp": timestamp}
-        params["signature"] = create_signature(params, API_SECRET)
 
         headers = {"X-MEXC-APIKEY": API_KEY}
 
-        response = requests.get(f"{MEXC_API_URL}/api/v3/account", headers=headers, params=params)
-        data = response.json()
-
-        logging.info(f"MEXC API Yanıtı: {data}")
-
-        if "balances" in data:
-            btc_balance = next((item["free"] for item in data["balances"] if item["asset"] == "BTC"), "0")
-            usdt_balance = next((item["free"] for item in data["balances"] if item["asset"] == "USDT"), "0")
-        else:
-            return jsonify({"error": "MEXC API beklenen formatta yanıt vermedi.", "response": data})
-
-        return jsonify({"BTC Balance": btc_balance, "USDT Balance": usdt_balance})
-
-    except Exception as e:
-        logging.error(f"Bakiye sorgulama hatası: {e}")
-        return jsonify({"error": str(e)})
-
-# ✅ BTC/USDT Piyasa Fiyatını Al
-@app.route('/price', methods=['GET'])
-def get_price():
-    try:
-        response = requests.get(f"{MEXC_API_URL}/api/v3/ticker/price?symbol=BTCUSDT")
-        data = response.json()
-
-        logging.info(f"MEXC'ten Gelen Fiyat Verisi: {data}")
-
-        return jsonify({"BTC/USDT Price": data.get("price", "Fiyat alınamadı")})
-
-    except Exception as e:
-        logging.error(f"Fiyat sorgulama hatası: {e}")
-        return jsonify({"error": str(e)})
-
-# ✅ Piyasa Fiyatından BTC Al (Market Order)
-@app.route('/buy', methods=['POST'])
-def buy_order():
-    try:
-        data = request.json
-        amount = float(data.get("amount", 0.001))
-        timestamp = int(time.time() * 1000)
-
-        params = {
-            "symbol": "BTCUSDT",
-            "side": "BUY",
-            "type": "MARKET",
-            "quantity": amount,
+        # Açık Emirleri (Open Orders) Sorgula
+        open_orders_params = {
+            "symbol": symbol,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, API_SECRET)
+        open_orders_params["signature"] = create_signature(open_orders_params, API_SECRET)
 
-        headers = {"X-MEXC-APIKEY": API_KEY}
+        open_orders_response = requests.get(f"{MEXC_API_URL}/api/v3/openOrders", headers=headers, params=open_orders_params)
+        open_orders_data = open_orders_response.json()
 
-        response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
-        data = response.json()
-
-        logging.info(f"BTC Alım Yanıtı: {data}")
-
-        return jsonify(data)
-
-    except Exception as e:
-        logging.error(f"BTC satın alma hatası: {e}")
-        return jsonify({"error": str(e)})
-
-# ✅ Piyasa Fiyatından BTC Sat (Market Order)
-@app.route('/sell', methods=['POST'])
-def sell_order():
-    try:
-        data = request.json
-        amount = float(data.get("amount", 0.001))
-        timestamp = int(time.time() * 1000)
-
-        params = {
-            "symbol": "BTCUSDT",
-            "side": "SELL",
-            "type": "MARKET",
-            "quantity": amount,
+        # Geçmiş Emirleri (All Orders) Sorgula
+        all_orders_params = {
+            "symbol": symbol,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, API_SECRET)
+        all_orders_params["signature"] = create_signature(all_orders_params, API_SECRET)
 
-        headers = {"X-MEXC-APIKEY": API_KEY}
+        all_orders_response = requests.get(f"{MEXC_API_URL}/api/v3/allOrders", headers=headers, params=all_orders_params)
+        all_orders_data = all_orders_response.json()
 
-        response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
-        data = response.json()
+        logging.info(f"Açık Emirler: {open_orders_data}")
+        logging.info(f"Geçmiş Emirler: {all_orders_data}")
 
-        logging.info(f"BTC Satış Yanıtı: {data}")
-
-        return jsonify(data)
+        return jsonify({
+            "symbol": symbol,
+            "open_orders": open_orders_data,
+            "all_orders": all_orders_data
+        })
 
     except Exception as e:
-        logging.error(f"BTC satma hatası: {e}")
+        logging.error(f"Emir sorgulama hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ API'nin Çalıştığını Kontrol Etmek İçin Ana Sayfa
@@ -132,7 +72,6 @@ def home():
 
 # ✅ Render.com İçin Gerekli Ayarlar
 if __name__ == "__main__":
-    import os
     from waitress import serve
     port = int(os.environ.get("PORT", 10000))
     serve(app, host="0.0.0.0", port=port)
