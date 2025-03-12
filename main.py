@@ -12,8 +12,8 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # ✅ Çevresel Değişkenlerden API Key ve Secret'ı Al
-API_KEY = os.getenv("BYBIT_DEMO_API_KEY")
-API_SECRET = os.getenv("BYBIT_DEMO_API_SECRET")
+API_KEY = os.getenv("BYBIT_DEMO_API_KEY", "mJxw6QGf2A8m6CQrmD")  # Eğer tanımlı değilse, senin API Key’in
+API_SECRET = os.getenv("BYBIT_DEMO_API_SECRET", "w5nAs9BXEb5XXhzVjtjJvzPwjChvEujLvevJ")  # Eğer tanımlı değilse, senin Secret Key’in
 
 # ✅ Bybit Demo API URL
 BYBIT_API_URL = "https://api-testnet.bybit.com"
@@ -42,8 +42,8 @@ def get_balance():
         logging.info(f"Bybit API Yanıtı: {data}")
 
         if "result" in data:
-            usdt_balance = data["result"]["USDT"]["available_balance"]
-            btc_balance = data["result"]["BTC"]["available_balance"]
+            usdt_balance = data["result"].get("USDT", {}).get("available_balance", "0")
+            btc_balance = data["result"].get("BTC", {}).get("available_balance", "0")
         else:
             return jsonify({"error": "Bybit API beklenen formatta yanıt vermedi.", "response": data})
 
