@@ -8,8 +8,8 @@ import json
 app = Flask(__name__)
 
 # ✅ MEXC API Bilgilerini Gir
-api_key = "GERÇEK_MEXC_API_KEY"  # MEXC API Key
-api_secret = "GERÇEK_MEXC_SECRET_KEY"  # MEXC Secret Key
+api_key = "GERCEK_MEXC_API_KEY"  # MEXC API Key
+api_secret = "GERCEK_MEXC_SECRET_KEY"  # MEXC Secret Key
 
 # ✅ MEXC API URL
 MEXC_API_URL = "https://api.mexc.com"
