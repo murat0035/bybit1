@@ -7,8 +7,8 @@ import hmac
 app = Flask(__name__)
 
 # ✅ MEXC API Bilgilerini Gir
-API_KEY = "GERÇEK_MEXC_API_KEY"  # MEXC API Key
-API_SECRET = "GERÇEK_MEXC_SECRET_KEY"  # MEXC Secret Key
+API_KEY = "ab5yV7DLOMbv4KbK6i"  # MEXC API Key
+API_SECRET = "kh5dYpNm052cjq2U6qkt6vbvt25Bu0BFkbhc"  # MEXC Secret Key
 
 # ✅ MEXC API URL
 MEXC_API_URL = "https://api.mexc.com"
