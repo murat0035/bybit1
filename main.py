@@ -3,13 +3,12 @@ import requests
 import time
 import hashlib
 import hmac
-import json
 
 app = Flask(__name__)
 
 # ✅ MEXC API Bilgilerini Gir
-api_key = "GERÇEK_MEXC_API_KEY"  # MEXC API Key
-api_secret = "GERÇEK_MEXC_SECRET_KEY"  # MEXC Secret Key
+API_KEY = "GERÇEK_MEXC_API_KEY"  # MEXC API Key
+API_SECRET = "GERÇEK_MEXC_SECRET_KEY"  # MEXC Secret Key
 
 # ✅ MEXC API URL
 MEXC_API_URL = "https://api.mexc.com"
@@ -27,10 +26,10 @@ def get_balance():
         params = {
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, api_secret)
+        params["signature"] = create_signature(params, API_SECRET)
 
         headers = {
-            "X-MEXC-APIKEY": api_key
+            "X-MEXC-APIKEY": API_KEY
         }
 
         response = requests.get(f"{MEXC_API_URL}/api/v3/account", headers=headers, params=params)
@@ -38,9 +37,12 @@ def get_balance():
 
         print("MEXC API Yanıtı:", data)  # Loglara yaz
 
+        if response.status_code != 200:
+            return jsonify({"error": "MEXC API hata döndürdü.", "response": data})
+
         if "balances" in data:
-            btc_balance = next((item["free"] for item in data["balances"] if item["asset"] == "BTC"), 0)
-            usdt_balance = next((item["free"] for item in data["balances"] if item["asset"] == "USDT"), 0)
+            btc_balance = next((item["free"] for item in data["balances"] if item["asset"] == "BTC"), "0.0")
+            usdt_balance = next((item["free"] for item in data["balances"] if item["asset"] == "USDT"), "0.0")
         else:
             return jsonify({"error": "MEXC API beklenen formatta yanıt vermedi.", "response": data})
 
@@ -60,6 +62,9 @@ def get_price():
         data = response.json()
 
         print("MEXC'ten Gelen Fiyat Verisi:", data)  # Loglara yaz
+
+        if response.status_code != 200:
+            return jsonify({"error": "MEXC API hata döndürdü.", "response": data})
 
         return jsonify({"BTC/USDT Price": data.get("price", "Fiyat alınamadı")})
 
@@ -81,16 +86,19 @@ def buy_order():
             "quantity": amount,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, api_secret)
+        params["signature"] = create_signature(params, API_SECRET)
 
         headers = {
-            "X-MEXC-APIKEY": api_key
+            "X-MEXC-APIKEY": API_KEY
         }
 
         response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
         data = response.json()
 
         print("BTC Alım Yanıtı:", data)  # Loglara yaz
+
+        if response.status_code != 200:
+            return jsonify({"error": "MEXC API hata döndürdü.", "response": data})
 
         return jsonify(data)
 
@@ -112,16 +120,19 @@ def sell_order():
             "quantity": amount,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, api_secret)
+        params["signature"] = create_signature(params, API_SECRET)
 
         headers = {
-            "X-MEXC-APIKEY": api_key
+            "X-MEXC-APIKEY": API_KEY
         }
 
         response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
         data = response.json()
 
         print("BTC Satış Yanıtı:", data)  # Loglara yaz
+
+        if response.status_code != 200:
+            return jsonify({"error": "MEXC API hata döndürdü.", "response": data})
 
         return jsonify(data)
 
