@@ -3,13 +3,17 @@ import requests
 import time
 import hashlib
 import hmac
-import json
+import os
+import logging
 
 app = Flask(__name__)
 
-# ✅ MEXC API Bilgilerini Gir
-api_key = "GERCEK_MEXC_API_KEY"  # MEXC API Key
-api_secret = "GERCEK_MEXC_SECRET_KEY"  # MEXC Secret Key
+# ✅ Render.com için Log Ayarları
+logging.basicConfig(level=logging.INFO)
+
+# ✅ Çevresel Değişkenlerden API Key ve Secret'ı Al
+API_KEY = os.getenv("MEXC_API_KEY")
+API_SECRET = os.getenv("MEXC_API_SECRET")
 
 # ✅ MEXC API URL
 MEXC_API_URL = "https://api.mexc.com"
@@ -24,32 +28,26 @@ def create_signature(params, secret):
 def get_balance():
     try:
         timestamp = int(time.time() * 1000)
-        params = {
-            "timestamp": timestamp
-        }
-        params["signature"] = create_signature(params, api_secret)
+        params = {"timestamp": timestamp}
+        params["signature"] = create_signature(params, API_SECRET)
 
-        headers = {
-            "X-MEXC-APIKEY": api_key
-        }
+        headers = {"X-MEXC-APIKEY": API_KEY}
 
         response = requests.get(f"{MEXC_API_URL}/api/v3/account", headers=headers, params=params)
         data = response.json()
 
-        print("MEXC API Yanıtı:", data)  # Loglara yaz
+        logging.info(f"MEXC API Yanıtı: {data}")
 
         if "balances" in data:
-            btc_balance = next((item["free"] for item in data["balances"] if item["asset"] == "BTC"), 0)
-            usdt_balance = next((item["free"] for item in data["balances"] if item["asset"] == "USDT"), 0)
+            btc_balance = next((item["free"] for item in data["balances"] if item["asset"] == "BTC"), "0")
+            usdt_balance = next((item["free"] for item in data["balances"] if item["asset"] == "USDT"), "0")
         else:
             return jsonify({"error": "MEXC API beklenen formatta yanıt vermedi.", "response": data})
 
-        return jsonify({
-            "BTC Balance": btc_balance,
-            "USDT Balance": usdt_balance
-        })
+        return jsonify({"BTC Balance": btc_balance, "USDT Balance": usdt_balance})
 
     except Exception as e:
+        logging.error(f"Bakiye sorgulama hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ BTC/USDT Piyasa Fiyatını Al
@@ -59,11 +57,12 @@ def get_price():
         response = requests.get(f"{MEXC_API_URL}/api/v3/ticker/price?symbol=BTCUSDT")
         data = response.json()
 
-        print("MEXC'ten Gelen Fiyat Verisi:", data)  # Loglara yaz
+        logging.info(f"MEXC'ten Gelen Fiyat Verisi: {data}")
 
         return jsonify({"BTC/USDT Price": data.get("price", "Fiyat alınamadı")})
 
     except Exception as e:
+        logging.error(f"Fiyat sorgulama hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ Piyasa Fiyatından BTC Al (Market Order)
@@ -71,7 +70,7 @@ def get_price():
 def buy_order():
     try:
         data = request.json
-        amount = float(data.get("amount", 0.001))  # Varsayılan 0.001 BTC
+        amount = float(data.get("amount", 0.001))
         timestamp = int(time.time() * 1000)
 
         params = {
@@ -81,20 +80,19 @@ def buy_order():
             "quantity": amount,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, api_secret)
+        params["signature"] = create_signature(params, API_SECRET)
 
-        headers = {
-            "X-MEXC-APIKEY": api_key
-        }
+        headers = {"X-MEXC-APIKEY": API_KEY}
 
         response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
         data = response.json()
 
-        print("BTC Alım Yanıtı:", data)  # Loglara yaz
+        logging.info(f"BTC Alım Yanıtı: {data}")
 
         return jsonify(data)
 
     except Exception as e:
+        logging.error(f"BTC satın alma hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ Piyasa Fiyatından BTC Sat (Market Order)
@@ -102,7 +100,7 @@ def buy_order():
 def sell_order():
     try:
         data = request.json
-        amount = float(data.get("amount", 0.001))  # Varsayılan 0.001 BTC
+        amount = float(data.get("amount", 0.001))
         timestamp = int(time.time() * 1000)
 
         params = {
@@ -112,20 +110,19 @@ def sell_order():
             "quantity": amount,
             "timestamp": timestamp
         }
-        params["signature"] = create_signature(params, api_secret)
+        params["signature"] = create_signature(params, API_SECRET)
 
-        headers = {
-            "X-MEXC-APIKEY": api_key
-        }
+        headers = {"X-MEXC-APIKEY": API_KEY}
 
         response = requests.post(f"{MEXC_API_URL}/api/v3/order", headers=headers, params=params)
         data = response.json()
 
-        print("BTC Satış Yanıtı:", data)  # Loglara yaz
+        logging.info(f"BTC Satış Yanıtı: {data}")
 
         return jsonify(data)
 
     except Exception as e:
+        logging.error(f"BTC satma hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ API'nin Çalıştığını Kontrol Etmek İçin Ana Sayfa
@@ -133,5 +130,9 @@ def sell_order():
 def home():
     return "✅ MEXC API bağlantısı aktif! BTC/USDT işlemleri için hazır."
 
+# ✅ Render.com İçin Gerekli Ayarlar
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+    import os
+    from waitress import serve
+    port = int(os.environ.get("PORT", 10000))
+    serve(app, host="0.0.0.0", port=port)
