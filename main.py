@@ -12,63 +12,132 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # ✅ Çevresel Değişkenlerden API Key ve Secret'ı Al
-API_KEY = os.getenv("MEXC_API_KEY")
-API_SECRET = os.getenv("MEXC_API_SECRET")
+API_KEY = os.getenv("BYBIT_DEMO_API_KEY")
+API_SECRET = os.getenv("BYBIT_DEMO_API_SECRET")
 
-# ✅ MEXC API URL
-MEXC_API_URL = "https://api.mexc.com"
+# ✅ Bybit Demo API URL
+BYBIT_API_URL = "https://api-testnet.bybit.com"
 
-# ✅ MEXC API İmzalama Fonksiyonu
+# ✅ Bybit API İmzalama Fonksiyonu
 def create_signature(params, secret):
-    query_string = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
+    sorted_params = sorted(params.items())
+    query_string = "&".join(f"{key}={value}" for key, value in sorted_params)
     return hmac.new(secret.encode(), query_string.encode(), hashlib.sha256).hexdigest()
 
-# ✅ Açık ve Geçmiş Siparişleri (Orders) Sorgula
-@app.route('/orders', methods=['GET'])
-def get_orders():
+# ✅ Bybit API Üzerinden Bakiye Sorgulama
+@app.route('/balance', methods=['GET'])
+def get_balance():
     try:
-        symbol = request.args.get("symbol", "BTCUSDT")  # Varsayılan BTC/USDT
-        timestamp = int(time.time() * 1000)
-
-        headers = {"X-MEXC-APIKEY": API_KEY}
-
-        # Açık Emirleri (Open Orders) Sorgula
-        open_orders_params = {
-            "symbol": symbol,
+        timestamp = str(int(time.time() * 1000))
+        params = {
+            "api_key": API_KEY,
             "timestamp": timestamp
         }
-        open_orders_params["signature"] = create_signature(open_orders_params, API_SECRET)
+        params["sign"] = create_signature(params, API_SECRET)
 
-        open_orders_response = requests.get(f"{MEXC_API_URL}/api/v3/openOrders", headers=headers, params=open_orders_params)
-        open_orders_data = open_orders_response.json()
+        headers = {"Content-Type": "application/json"}
+        response = requests.get(f"{BYBIT_API_URL}/v2/private/wallet/balance", headers=headers, params=params)
+        data = response.json()
 
-        # Geçmiş Emirleri (All Orders) Sorgula
-        all_orders_params = {
-            "symbol": symbol,
-            "timestamp": timestamp
-        }
-        all_orders_params["signature"] = create_signature(all_orders_params, API_SECRET)
+        logging.info(f"Bybit API Yanıtı: {data}")
 
-        all_orders_response = requests.get(f"{MEXC_API_URL}/api/v3/allOrders", headers=headers, params=all_orders_params)
-        all_orders_data = all_orders_response.json()
+        if "result" in data:
+            usdt_balance = data["result"]["USDT"]["available_balance"]
+            btc_balance = data["result"]["BTC"]["available_balance"]
+        else:
+            return jsonify({"error": "Bybit API beklenen formatta yanıt vermedi.", "response": data})
 
-        logging.info(f"Açık Emirler: {open_orders_data}")
-        logging.info(f"Geçmiş Emirler: {all_orders_data}")
-
-        return jsonify({
-            "symbol": symbol,
-            "open_orders": open_orders_data,
-            "all_orders": all_orders_data
-        })
+        return jsonify({"BTC Balance": btc_balance, "USDT Balance": usdt_balance})
 
     except Exception as e:
-        logging.error(f"Emir sorgulama hatası: {e}")
+        logging.error(f"Bakiye sorgulama hatası: {e}")
+        return jsonify({"error": str(e)})
+
+# ✅ BTC/USDT Piyasa Fiyatını Al
+@app.route('/price', methods=['GET'])
+def get_price():
+    try:
+        response = requests.get(f"{BYBIT_API_URL}/v2/public/tickers")
+        data = response.json()
+
+        logging.info(f"Bybit'ten Gelen Fiyat Verisi: {data}")
+
+        for ticker in data.get("result", []):
+            if ticker["symbol"] == "BTCUSDT":
+                return jsonify({"BTC/USDT Price": ticker["last_price"]})
+
+        return jsonify({"error": "BTC/USDT fiyatı bulunamadı.", "response": data})
+
+    except Exception as e:
+        logging.error(f"Fiyat sorgulama hatası: {e}")
+        return jsonify({"error": str(e)})
+
+# ✅ Piyasa Fiyatından BTC Al (Market Order)
+@app.route('/buy', methods=['POST'])
+def buy_order():
+    try:
+        data = request.json
+        amount = float(data.get("amount", 0.001))
+        timestamp = str(int(time.time() * 1000))
+
+        params = {
+            "api_key": API_KEY,
+            "symbol": "BTCUSDT",
+            "side": "Buy",
+            "order_type": "Market",
+            "qty": amount,
+            "time_in_force": "GTC",
+            "timestamp": timestamp
+        }
+        params["sign"] = create_signature(params, API_SECRET)
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(f"{BYBIT_API_URL}/v2/private/order/create", headers=headers, params=params)
+        data = response.json()
+
+        logging.info(f"BTC Alım Yanıtı: {data}")
+
+        return jsonify(data)
+
+    except Exception as e:
+        logging.error(f"BTC satın alma hatası: {e}")
+        return jsonify({"error": str(e)})
+
+# ✅ Piyasa Fiyatından BTC Sat (Market Order)
+@app.route('/sell', methods=['POST'])
+def sell_order():
+    try:
+        data = request.json
+        amount = float(data.get("amount", 0.001))
+        timestamp = str(int(time.time() * 1000))
+
+        params = {
+            "api_key": API_KEY,
+            "symbol": "BTCUSDT",
+            "side": "Sell",
+            "order_type": "Market",
+            "qty": amount,
+            "time_in_force": "GTC",
+            "timestamp": timestamp
+        }
+        params["sign"] = create_signature(params, API_SECRET)
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(f"{BYBIT_API_URL}/v2/private/order/create", headers=headers, params=params)
+        data = response.json()
+
+        logging.info(f"BTC Satış Yanıtı: {data}")
+
+        return jsonify(data)
+
+    except Exception as e:
+        logging.error(f"BTC satma hatası: {e}")
         return jsonify({"error": str(e)})
 
 # ✅ API'nin Çalıştığını Kontrol Etmek İçin Ana Sayfa
 @app.route("/")
 def home():
-    return "✅ MEXC API bağlantısı aktif! BTC/USDT işlemleri için hazır."
+    return "✅ Bybit Demo API bağlantısı aktif! BTC/USDT işlemleri için hazır."
 
 # ✅ Render.com İçin Gerekli Ayarlar
 if __name__ == "__main__":
